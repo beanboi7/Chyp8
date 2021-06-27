@@ -1,9 +1,8 @@
 package chyp
 
 import (
-	"chyp-8/insides/screen"
+	"fmt"
 	"io/ioutil"
-	"os"
 	"time"
 
 	"github.com/beanboi7/chyp-8/insides/screen"
@@ -21,9 +20,10 @@ type EMU struct {
 	stack           [16]uint16
 	sp              uint16
 	keyboard        [16]uint8
-	draw            bool
+	updateScreen    bool
 	audioChannel    chan struct{}
 	shutdownChannel chan struct{}
+	window          *screen.Window
 }
 
 const (
@@ -47,11 +47,11 @@ func NewEMU(romPath string, clockSpeed int) (*EMU, error) {
 		stack:           [16]uint16{},
 		sp:              0,
 		keyboard:        [16]uint8{},
-		draw:            false,
+		updateScreen:    false,
 		audioChannel:    make(chan struct{}),
 		shutdownChannel: make(chan struct{}),
+		window:          &screen.Window{},
 	}
-
 	emu.loadFont()
 
 	err := emu.LoadROM(romPath)
@@ -84,18 +84,25 @@ func (emu *EMU) LoadROM(filename string) error {
 	}
 }
 
-func EmulateCycle(file *os.File) {
+//after creating a new emu, it should be Run
 
-	//Fetch
-	//Decode
-	//Execute
-
-	//load fontset from memory
-
-	//Reset timers
+func (emu *EMU) Run() {
+	for {
+		emu.EmulateCycle()
+	}
 
 }
 
-func SetKeys() {
+func (emu *EMU) EmulateCycle() {
+	emu.opcode = uint16(emu.memory[emu.pc]<<8 | emu.memory[emu.pc+1])
+	emu.updateScreen = false
 
+	err := emu.opCodeParser()
+	if err != nil {
+		fmt.Printf("error parsing opcode: %v", err)
+	}
+}
+
+func (emu *EMU) opCodeParser() error {
+	//big shit logic for parsing the opcode
 }

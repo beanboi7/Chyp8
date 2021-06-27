@@ -1,7 +1,8 @@
 package screen
 
 import (
-	"github.com/faiface/pixel"
+	"time"
+
 	"github.com/faiface/pixel/pixelgl"
 )
 
@@ -24,18 +25,8 @@ var FontSet = [80]uint8{
 	0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 }
 
-func run() {
-	cfg := pixelgl.WindowConfig{
-		Title:  "Vanga nanba!",
-		Bounds: pixel.R(0, 0, 512, 384),
-		VSync:  true,
-	}
-	win, err := pixelgl.NewWindow(cfg)
-	if err != nil {
-		panic(err)
-	}
-
-	for !win.Closed() {
-		win.Update()
-	}
+type Window struct {
+	*pixelgl.Window
+	KeyMap     map[uint16]pixelgl.Button
+	KeysPushed [16]*time.Ticker
 }
