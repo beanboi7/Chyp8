@@ -1,4 +1,4 @@
-module chyp-8
+module chyp8
 
 go 1.16
 
