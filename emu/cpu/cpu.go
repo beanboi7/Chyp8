@@ -2,10 +2,12 @@ package chyp
 
 import (
 	"fmt"
+	"image/color"
 	"io/ioutil"
+	"math/rand"
 	"time"
 
-	"github.com/beanboi7/chyp-8/insides/screen"
+	"chyp8/emu/screen"
 )
 
 type EMU struct {
@@ -105,11 +107,9 @@ func (emu *EMU) LoadROM(filename string) error {
 	return nil
 }
 
-//after creating a new emu, it should be Run
-
 func (emu *EMU) Run() {
 	for {
-		emu.EmulateCycle()
+
 	}
 
 }
@@ -125,6 +125,134 @@ func (emu *EMU) EmulateCycle() {
 }
 
 func (emu *EMU) opCodeParser() error {
-	//big shit logic for parsing the opcode
+	n := emu.opcode & 0x000F
+	x := emu.opcode & 0x0F00
+	y := emu.opcode & 0x00F0
+	kk := emu.opcode & 0x00FF
+	F := 15
+
+	switch emu.opcode & 0x0FFF {
+	case 0x00E0:
+		emu.window.Clear(color.Black)
+	case 0x00EE:
+		emu.pc = emu.stack[emu.sp]
+		emu.sp--
+	}
+
+	switch emu.opcode & 0xF000 {
+	case 0x1000:
+		addr := emu.opcode & 0x0FFF
+		emu.pc = addr
+	case 0x2000:
+		addr := emu.opcode & 0x0FFF
+		emu.pc = addr
+		emu.sp++
+		emu.stack[emu.sp] = emu.pc
+	case 0x3000:
+		if emu.V[x] == uint8(kk) {
+			emu.pc += 2
+		}
+	case 0x4000:
+		if emu.V[x] != uint8(kk) {
+			emu.pc += 2
+		}
+	case 0x5000:
+		if emu.V[x] == emu.V[y] {
+			emu.pc += 2
+		}
+	case 0x6000:
+		emu.V[x] = uint8(kk)
+	case 0x7000:
+		emu.V[x] += uint8(kk)
+	case 0x8000:
+		switch n {
+		case 0:
+			emu.V[x] = emu.V[y]
+		case 1:
+			emu.V[x] |= emu.V[y]
+		case 2:
+			emu.V[x] &= emu.V[y]
+		case 3:
+			emu.V[x] ^= emu.V[y]
+		case 4:
+			emu.V[x] += emu.V[y]
+			if emu.V[x] >= 0xFF {
+				emu.V[F] = 1
+			} else {
+				emu.V[F] = 0
+			}
+		case 5:
+			if emu.V[x] > emu.V[y] {
+				emu.V[F] = 1
+			} else {
+				emu.V[F] = 0
+			}
+			emu.V[x] -= emu.V[y]
+		case 6:
+			//Vx>>=1
+			if emu.V[x]&00000001 == 1 {
+				emu.V[F] = 1
+			} else {
+				emu.V[F] = 0
+			}
+			emu.V[x] /= 2
+
+		case 7:
+			if emu.V[y] > emu.V[x] {
+				emu.V[F] = 1
+			} else {
+				emu.V[F] = 0
+			}
+			emu.V[x] = emu.V[y] - emu.V[x]
+
+		case 0x000E:
+			//Vx<<=1
+			if emu.V[x]&64 == 1 {
+				emu.V[F] = 1
+				emu.V[x] *= 2
+			} else {
+				emu.V[F] = 0
+			}
+		}
+	case 0x9000:
+		if emu.V[x] != emu.V[y] {
+			emu.pc += 2
+		}
+
+	case 0xA000:
+		addr := emu.opcode & 0x0FFF
+		emu.I = addr
+	case 0xB000:
+		addr := emu.opcode & 0x0FFF
+		emu.pc = uint16(emu.V[0] + uint8(addr))
+	case 0xC000:
+		random := rand.Intn(255-0) + 0
+		emu.V[x] = uint8(random & int(kk))
+	case 0xD000:
+		//draw sprites on the screen
+	case 0xE000:
+		//make the keyboard mapping and come here
+
+	case 0xF000:
+		addr := emu.opcode & 0x00FF
+		switch addr {
+		case 0x07:
+			// delay_timer shit,need more clarity on how to setup DT
+			emu.V[x] = emu.delay_timer
+		case 0x0A:
+			//keypress clarity needed
+		case 0x15:
+			emu.delay_timer = emu.V[x]
+		case 0x18:
+			emu.sound_timer = emu.V[x]
+		case 0x1E:
+			emu.I = emu.I + uint16(emu.V[x])
+		case 0x29:
+			//sprites and shit
+		case 0x33:
+			// emu.memory[emu.I] =
+			// emu.memory[emu.I + 1] = emu.V[x]
+		}
+	}
 	return nil
 }
