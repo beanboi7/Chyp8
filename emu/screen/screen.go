@@ -11,6 +11,7 @@ type Window struct {
 	*pixelgl.Window
 	KeyMap     map[uint16]pixelgl.Button
 	KeysPushed [16]*time.Ticker
+	Key        pixelgl.Button
 }
 
 func Screen() {

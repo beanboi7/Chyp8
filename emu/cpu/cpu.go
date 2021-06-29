@@ -2,7 +2,6 @@ package chyp
 
 import (
 	"fmt"
-	"image/color"
 	"io/ioutil"
 	"math/rand"
 	"time"
@@ -54,6 +53,33 @@ var FontSet = [80]uint8{
 	0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 }
 
+func (emu *EMU) keyPress() uint16 {
+	emu.window.KeyMap[uint16(pixelgl.Key1)] = 0x01
+	emu.window.KeyMap[uint16(pixelgl.Key2)] = 0x02
+	emu.window.KeyMap[uint16(pixelgl.Key3)] = 0x03
+	emu.window.KeyMap[uint16(pixelgl.KeyQ)] = 0x04
+	emu.window.KeyMap[uint16(pixelgl.KeyW)] = 0x05
+	emu.window.KeyMap[uint16(pixelgl.KeyE)] = 0x06
+	emu.window.KeyMap[uint16(pixelgl.KeyA)] = 0x07
+	emu.window.KeyMap[uint16(pixelgl.KeyS)] = 0x08
+	emu.window.KeyMap[uint16(pixelgl.KeyD)] = 0x09
+	emu.window.KeyMap[uint16(pixelgl.KeyZ)] = 0x0A
+	emu.window.KeyMap[uint16(pixelgl.KeyX)] = 0x00
+	emu.window.KeyMap[uint16(pixelgl.KeyC)] = 0x0B
+	emu.window.KeyMap[uint16(pixelgl.Key4)] = 0x0C
+	emu.window.KeyMap[uint16(pixelgl.KeyR)] = 0x0D
+	emu.window.KeyMap[uint16(pixelgl.KeyF)] = 0x0E
+	emu.window.KeyMap[uint16(pixelgl.KeyV)] = 0x0F
+
+	switch pixelgl.JustPressed(pixelgl.Button) {
+	case pixelgl.Key1:
+		return emu.window.KeyMap[uint16(pixelgl.Key1)]
+		break
+	case pixelgl.Key2:
+		return
+	}
+}
+
 //should init window and EMU,
 //load fontset from ROM to mem, return pointer to VM or an error
 func NewEMU(romPath string, clockSpeed int) (*EMU, error) {
@@ -76,7 +102,6 @@ func NewEMU(romPath string, clockSpeed int) (*EMU, error) {
 		window:          &screen.Window{},
 	}
 	emu.loadFont()
-	emu.keySetup()
 	err := emu.LoadROM(romPath)
 	if err != nil {
 		return nil, err
@@ -135,7 +160,8 @@ func (emu *EMU) opCodeParser() error {
 
 	switch emu.opcode & 0x0FFF {
 	case 0x00E0:
-		emu.window.Clear(color.Black)
+		emu.gfx = [64 * 32]byte{}
+		emu.pc += 2
 		break
 	case 0x00EE:
 		emu.pc = emu.stack[emu.sp]
@@ -156,38 +182,50 @@ func (emu *EMU) opCodeParser() error {
 		break
 	case 0x3000:
 		if emu.V[x] == uint8(kk) {
+			emu.pc += 4
+		} else {
 			emu.pc += 2
 		}
 		break
 	case 0x4000:
 		if emu.V[x] != uint8(kk) {
+			emu.pc += 4
+		} else {
 			emu.pc += 2
 		}
 		break
 	case 0x5000:
 		if emu.V[x] == emu.V[y] {
+			emu.pc += 4
+		} else {
 			emu.pc += 2
 		}
 		break
 	case 0x6000:
 		emu.V[x] = uint8(kk)
+		emu.pc += 2
 		break
 	case 0x7000:
 		emu.V[x] += uint8(kk)
+		emu.pc += 2
 		break
 	case 0x8000:
 		switch n {
 		case 0:
 			emu.V[x] = emu.V[y]
+			emu.pc += 2
 			break
 		case 1:
 			emu.V[x] |= emu.V[y]
+			emu.pc += 2
 			break
 		case 2:
 			emu.V[x] &= emu.V[y]
+			emu.pc += 2
 			break
 		case 3:
 			emu.V[x] ^= emu.V[y]
+			emu.pc += 2
 			break
 		case 4:
 			emu.V[x] += emu.V[y]
@@ -196,6 +234,7 @@ func (emu *EMU) opCodeParser() error {
 			} else {
 				emu.V[F] = 0
 			}
+			emu.pc += 2
 			break
 		case 5:
 			if emu.V[x] > emu.V[y] {
@@ -204,6 +243,7 @@ func (emu *EMU) opCodeParser() error {
 				emu.V[F] = 0
 			}
 			emu.V[x] -= emu.V[y]
+			emu.pc += 2
 			break
 		case 6:
 			//Vx>>=1
@@ -213,6 +253,7 @@ func (emu *EMU) opCodeParser() error {
 				emu.V[F] = 0
 			}
 			emu.V[x] /= 2
+			emu.pc += 2
 			break
 		case 7:
 			if emu.V[y] > emu.V[x] {
@@ -221,6 +262,7 @@ func (emu *EMU) opCodeParser() error {
 				emu.V[F] = 0
 			}
 			emu.V[x] = emu.V[y] - emu.V[x]
+			emu.pc += 2
 			break
 
 		case 0x000E:
@@ -231,30 +273,40 @@ func (emu *EMU) opCodeParser() error {
 			} else {
 				emu.V[F] = 0
 			}
+			emu.pc += 2
 			break
 		}
 		break
 	case 0x9000:
 		if emu.V[x] != emu.V[y] {
+			emu.pc += 4
+		} else {
 			emu.pc += 2
 		}
 		break
 	case 0xA000:
 		addr := emu.opcode & 0x0FFF
 		emu.I = addr
+		emu.pc += 2
 		break
 	case 0xB000:
 		addr := emu.opcode & 0x0FFF
 		emu.pc = uint16(emu.V[0] + uint8(addr))
+		emu.pc += 2
 		break
 	case 0xC000:
 		random := rand.Intn(255-0) + 0
 		emu.V[x] = uint8(random & int(kk))
+		emu.pc += 2
 		break
 	case 0xD000:
 		//draw sprites on the screen
 	case 0xE000:
 		//make the keyboard mapping and come here
+		switch kk {
+		case 0x9E:
+
+		}
 
 	case 0xF000:
 		addr := emu.opcode & 0x00FF
@@ -262,17 +314,21 @@ func (emu *EMU) opCodeParser() error {
 		case 0x07:
 			// delay_timer shit,need more clarity on how to setup DT
 			emu.V[x] = emu.delayTimer
+			emu.pc += 2
 			break
 		case 0x0A:
 			//keypress clarity needed
 		case 0x15:
 			emu.delayTimer = emu.V[x]
+			emu.pc += 2
 			break
 		case 0x18:
 			emu.soundTimer = emu.V[x]
+			emu.pc += 2
 			break
 		case 0x1E:
 			emu.I = emu.I + uint16(emu.V[x])
+			emu.pc += 2
 			break
 		case 0x29:
 			//sprites and shit
@@ -284,32 +340,15 @@ func (emu *EMU) opCodeParser() error {
 			for i := 0; i < int(x); i++ {
 				emu.memory[emu.I+uint16(i)] = emu.V[i]
 			}
+			emu.pc += 2
 			break
 		case 0x65:
 			for i := 0; i < int(x); i++ {
 				emu.V[i] = emu.memory[emu.I+uint16(i)]
 			}
+			emu.pc += 2
 			break
 		}
 	}
 	return nil
-}
-
-func (emu *EMU) keySetup() {
-	emu.window.KeyMap[uint16(pixelgl.Key1)] = 0x01
-	emu.window.KeyMap[uint16(pixelgl.Key2)] = 0x02
-	emu.window.KeyMap[uint16(pixelgl.Key3)] = 0x03
-	emu.window.KeyMap[uint16(pixelgl.KeyQ)] = 0x04
-	emu.window.KeyMap[uint16(pixelgl.KeyW)] = 0x05
-	emu.window.KeyMap[uint16(pixelgl.KeyE)] = 0x06
-	emu.window.KeyMap[uint16(pixelgl.KeyA)] = 0x07
-	emu.window.KeyMap[uint16(pixelgl.KeyS)] = 0x08
-	emu.window.KeyMap[uint16(pixelgl.KeyD)] = 0x09
-	emu.window.KeyMap[uint16(pixelgl.KeyZ)] = 0x0A
-	emu.window.KeyMap[uint16(pixelgl.KeyX)] = 0x00
-	emu.window.KeyMap[uint16(pixelgl.KeyC)] = 0x0B
-	emu.window.KeyMap[uint16(pixelgl.Key4)] = 0x0C
-	emu.window.KeyMap[uint16(pixelgl.KeyR)] = 0x0D
-	emu.window.KeyMap[uint16(pixelgl.KeyF)] = 0x0E
-	emu.window.KeyMap[uint16(pixelgl.KeyV)] = 0x0F
 }
