@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"chyp8/emu/screen"
-
-	"github.com/faiface/pixel/pixelgl"
 )
 
 type EMU struct {
@@ -51,33 +49,6 @@ var FontSet = [80]uint8{
 	0xE0, 0x90, 0x90, 0x90, 0xE0, // D
 	0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
 	0xF0, 0x80, 0xF0, 0x80, 0x80, // F
-}
-
-func (emu *EMU) keyPress() uint16 {
-	emu.window.KeyMap[uint16(pixelgl.Key1)] = 0x01
-	emu.window.KeyMap[uint16(pixelgl.Key2)] = 0x02
-	emu.window.KeyMap[uint16(pixelgl.Key3)] = 0x03
-	emu.window.KeyMap[uint16(pixelgl.KeyQ)] = 0x04
-	emu.window.KeyMap[uint16(pixelgl.KeyW)] = 0x05
-	emu.window.KeyMap[uint16(pixelgl.KeyE)] = 0x06
-	emu.window.KeyMap[uint16(pixelgl.KeyA)] = 0x07
-	emu.window.KeyMap[uint16(pixelgl.KeyS)] = 0x08
-	emu.window.KeyMap[uint16(pixelgl.KeyD)] = 0x09
-	emu.window.KeyMap[uint16(pixelgl.KeyZ)] = 0x0A
-	emu.window.KeyMap[uint16(pixelgl.KeyX)] = 0x00
-	emu.window.KeyMap[uint16(pixelgl.KeyC)] = 0x0B
-	emu.window.KeyMap[uint16(pixelgl.Key4)] = 0x0C
-	emu.window.KeyMap[uint16(pixelgl.KeyR)] = 0x0D
-	emu.window.KeyMap[uint16(pixelgl.KeyF)] = 0x0E
-	emu.window.KeyMap[uint16(pixelgl.KeyV)] = 0x0F
-
-	switch pixelgl.JustPressed(pixelgl.Button) {
-	case pixelgl.Key1:
-		return emu.window.KeyMap[uint16(pixelgl.Key1)]
-		break
-	case pixelgl.Key2:
-		return
-	}
 }
 
 //should init window and EMU,
@@ -160,7 +131,7 @@ func (emu *EMU) opCodeParser() error {
 
 	switch emu.opcode & 0x0FFF {
 	case 0x00E0:
-		emu.gfx = [64 * 32]byte{}
+		emu.display = [64 * 32]byte{}
 		emu.pc += 2
 		break
 	case 0x00EE:
@@ -275,6 +246,8 @@ func (emu *EMU) opCodeParser() error {
 			}
 			emu.pc += 2
 			break
+		default:
+			return emu.opCodeError(emu.opcode)
 		}
 		break
 	case 0x9000:
@@ -348,7 +321,19 @@ func (emu *EMU) opCodeParser() error {
 			}
 			emu.pc += 2
 			break
+		default:
+			return emu.opCodeError(emu.opcode)
 		}
+	default:
+		return emu.opCodeError(emu.opcode)
 	}
 	return nil
+}
+
+func (emu *EMU) opCodeError(opcode uint16) error {
+	return fmt.Errorf("Unknown opcode: %x", opcode)
+}
+
+func (emu *EMU) keyPressHandle() {
+
 }
