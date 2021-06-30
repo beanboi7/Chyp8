@@ -107,7 +107,9 @@ func (emu *EMU) LoadROM(filename string) error {
 
 func (emu *EMU) Run() {
 	for {
-
+		emu.EmulateCycle()
+		emu.soundTimerHandler()
+		emu.delayTimerHandler()
 	}
 
 }
@@ -332,6 +334,20 @@ func (emu *EMU) opCodeParser() error {
 
 func (emu *EMU) opCodeError(opcode uint16) error {
 	return fmt.Errorf("Unknown opcode: %x", opcode)
+}
+
+func (emu *EMU) soundTimerHandler() {
+	if emu.soundTimer > 0 && emu.soundTimer == 1 {
+		fmt.Println("BEEP!")
+		emu.soundTimer--
+		//get and decode the audio from the assets folder too hehe
+	}
+}
+
+func (emu *EMU) delayTimerHandler() {
+	if emu.delayTimer > 0 {
+		emu.delayTimer--
+	}
 }
 
 func (emu *EMU) keyPressHandle() {
