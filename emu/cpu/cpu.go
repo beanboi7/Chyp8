@@ -24,8 +24,8 @@ type EMU struct {
 	soundTimer      uint8 //same as above
 	stack           [16]uint16
 	sp              uint16
-	keyState        [16]uint8 //tells whether key is pressed or not
-	updateScreen    bool      //to draw or not
+	keyStates       [16]uint8 //tells whether key is pressed or not
+	drawF           bool      //to draw or not
 	audioChannel    chan struct{}
 	shutdownChannel chan struct{}
 	window          *screen.Window
@@ -70,8 +70,8 @@ func NewEMU(romPath string, clockSpeed int) (*EMU, error) {
 		soundTimer:      0,
 		stack:           [16]uint16{},
 		sp:              0,
-		keyState:        [16]uint8{},
-		updateScreen:    false,
+		keyStates:       [16]uint8{},
+		drawF:           false,
 		audioChannel:    make(chan struct{}),
 		shutdownChannel: make(chan struct{}),
 		window:          &screen.Window{},
@@ -120,7 +120,7 @@ func (emu *EMU) Run() {
 
 func (emu *EMU) EmulateCycle() {
 	emu.opcode = uint16(emu.memory[emu.pc]<<8 | emu.memory[emu.pc+1])
-	emu.updateScreen = false
+	emu.drawF = false
 
 	err := emu.opCodeParser()
 	if err != nil {
@@ -130,8 +130,8 @@ func (emu *EMU) EmulateCycle() {
 
 func (emu *EMU) opCodeParser() error {
 	n := emu.opcode & 0x000F
-	x := emu.opcode & 0x0F00
-	y := emu.opcode & 0x00F0
+	x := (emu.opcode & 0x0F00) >> 8 // right shift because V register has index from 0-15 only ad
+	y := (emu.opcode & 0x00F0) >> 4 // similar right shift to get the value of y to lie b/w 0 - 15
 	kk := emu.opcode & 0x00FF
 	F := 15
 
@@ -188,32 +188,32 @@ func (emu *EMU) opCodeParser() error {
 		break
 	case 0x8000:
 		switch n {
-		case 0:
+		case 0x0000:
 			emu.V[x] = emu.V[y]
 			emu.pc += 2
 			break
-		case 1:
+		case 0x0001:
 			emu.V[x] |= emu.V[y]
 			emu.pc += 2
 			break
-		case 2:
+		case 0x0002:
 			emu.V[x] &= emu.V[y]
 			emu.pc += 2
 			break
-		case 3:
+		case 0x0003:
 			emu.V[x] ^= emu.V[y]
 			emu.pc += 2
 			break
-		case 4:
+		case 0x0004:
 			emu.V[x] += emu.V[y]
-			if emu.V[x] >= 0xFF {
+			if emu.V[x] >= 0x00FF {
 				emu.V[F] = 1
 			} else {
 				emu.V[F] = 0
 			}
 			emu.pc += 2
 			break
-		case 5:
+		case 0x0005:
 			if emu.V[x] > emu.V[y] {
 				emu.V[F] = 1
 			} else {
@@ -222,9 +222,9 @@ func (emu *EMU) opCodeParser() error {
 			emu.V[x] -= emu.V[y]
 			emu.pc += 2
 			break
-		case 6:
+		case 0x0006:
 			//Vx>>=1
-			if emu.V[x]&00000001 == 1 {
+			if emu.V[x]&0x1 == 1 {
 				emu.V[F] = 1
 			} else {
 				emu.V[F] = 0
@@ -244,16 +244,11 @@ func (emu *EMU) opCodeParser() error {
 
 		case 0x000E:
 			//Vx<<=1
-			if emu.V[x]&64 == 1 {
-				emu.V[F] = 1
-				emu.V[x] *= 2
-			} else {
-				emu.V[F] = 0
-			}
+			//basically taking the value of MSB and storing in VF register
+			emu.V[F] = emu.V[x] >> 7
+			emu.V[x] <<= 1 //multiplying with two
 			emu.pc += 2
 			break
-		default:
-			return emu.opCodeError(emu.opcode)
 		}
 		break
 	case 0x9000:
@@ -284,19 +279,37 @@ func (emu *EMU) opCodeParser() error {
 		//make the keyboard mapping and come here
 		switch kk {
 		case 0x9E:
-
+			if emu.keyStates[emu.V[x]] != 0 {
+				emu.pc += 4
+			} else {
+				emu.pc += 2
+			}
+			break
+		case 0xA1:
+			if emu.keyStates[emu.V[x]] == 0 {
+				emu.pc += 4
+			} else {
+				emu.pc += 2
+			}
+			break
 		}
 
 	case 0xF000:
 		addr := emu.opcode & 0x00FF
 		switch addr {
 		case 0x07:
-			// delay_timer shit,need more clarity on how to setup DT
 			emu.V[x] = emu.delayTimer
 			emu.pc += 2
 			break
 		case 0x0A:
-			//keypress clarity needed
+			//awaits a keypress by checking value in the array, if true then sets the index to Vx
+			for i, val := range emu.keyStates {
+				if val != 0 {
+					emu.V[x] = uint8(i)
+				}
+			}
+			emu.pc += 2
+			break
 		case 0x15:
 			emu.delayTimer = emu.V[x]
 			emu.pc += 2
@@ -307,28 +320,34 @@ func (emu *EMU) opCodeParser() error {
 			break
 		case 0x1E:
 			emu.I = emu.I + uint16(emu.V[x])
+			if emu.I > 0xFFF {
+				emu.V[F] = 1
+			} else {
+				emu.V[F] = 0
+			}
 			emu.pc += 2
 			break
 		case 0x29:
 			//sprites and shit
 		case 0x33:
-			// emu.memory[emu.I] =
-			// emu.memory[emu.I + 1] = emu.V[x]
+			emu.memory[emu.I] = emu.V[x] / 100
+			emu.memory[emu.I+1] = (emu.V[x] / 10) % 10
+			emu.memory[emu.I+2] = (emu.V[x] % 100) % 10
+			emu.pc += 2
+			break
 
 		case 0x55:
-			for i := 0; i < int(x); i++ {
+			for i := 0; i < int(x+1); i++ {
 				emu.memory[emu.I+uint16(i)] = emu.V[i]
 			}
 			emu.pc += 2
 			break
 		case 0x65:
-			for i := 0; i < int(x); i++ {
+			for i := 0; i < int(x+1); i++ {
 				emu.V[i] = emu.memory[emu.I+uint16(i)]
 			}
 			emu.pc += 2
 			break
-		default:
-			return emu.opCodeError(emu.opcode)
 		}
 	default:
 		return emu.opCodeError(emu.opcode)
@@ -344,7 +363,6 @@ func (emu *EMU) soundTimerHandler() {
 	if emu.soundTimer > 0 && emu.soundTimer == 1 {
 		fmt.Println("BEEP!")
 		emu.soundTimer--
-		//get and decode the audio from the assets folder too hehe
 	}
 }
 
@@ -370,6 +388,6 @@ func (emu *EMU) ManageAudio() {
 	speaker.Play(streamer)
 }
 
-func (emu *EMU) keyPressHandle() {
+// func (emu *EMU) keyPressHandle() {
 
-}
+// }
