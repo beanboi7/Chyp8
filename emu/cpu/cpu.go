@@ -26,6 +26,7 @@ type EMU struct {
 	sp              uint16
 	keyStates       [16]uint8 //tells whether key is pressed or not
 	drawF           bool      //to draw or not
+	clock           *time.Ticker
 	audioChannel    chan struct{}
 	shutdownChannel chan struct{}
 	window          *screen.Window
@@ -111,10 +112,24 @@ func (emu *EMU) LoadROM(filename string) error {
 
 func (emu *EMU) Run() {
 	for {
-		emu.EmulateCycle()
-		emu.soundTimerHandler()
-		emu.delayTimerHandler()
+		select {
+		case <-emu.clock.C:
+			if !emu.window.Closed() {
+				emu.EmulateCycle()
+				emu.soundTimerHandler()
+				emu.delayTimerHandler()
+				//draworUPDATE()
+				//handlekeyinput()
+				continue
+			}
+			break
+		case <-emu.shutdownChannel:
+			break
+		}
+		break
 	}
+
+	emu.shutDownSignal("bye")
 
 }
 
@@ -275,6 +290,23 @@ func (emu *EMU) opCodeParser() error {
 		break
 	case 0xD000:
 		//draw sprites on the screen
+		emu.drawF = true //need to draw for this cycle
+		var rows uint16
+		var columns uint8
+		emu.V[F] = 0
+		for rows = 0; rows < n; rows++ {
+			spriteData := emu.memory[emu.I+rows] //sprite data is stored in the mem[I+yline] address
+			for columns = 0; columns < 8; columns++ {
+				//now to check if the read data from mem[I + ...] and the gfx[] data are set to 1, if yes then we need its 1XOR1 ,ie collision
+				if spriteData&(0x80>>columns) != 0 { //if the bit value read from mem is not 0 and
+					if emu.display[x+uint16(columns)+64*(y+rows)] == 1 { // bitwise value already on the screen is set to 1, then collison is detected and thus 1^1, ie XOR-ed and the V[F] = 1
+						emu.V[F] = 1 // collison detected
+					}
+					emu.display[x+uint16(columns)+64*(y+rows)] ^= 1
+				}
+			}
+		}
+		emu.pc += 2
 	case 0xE000:
 		//make the keyboard mapping and come here
 		switch kk {
@@ -328,7 +360,9 @@ func (emu *EMU) opCodeParser() error {
 			emu.pc += 2
 			break
 		case 0x29:
-			//sprites and shit
+			//no idea what this instruction does
+			emu.I = uint16(emu.V[x] * 0x5)
+			emu.pc += 2
 		case 0x33:
 			emu.memory[emu.I] = emu.V[x] / 100
 			emu.memory[emu.I+1] = (emu.V[x] / 10) % 10
@@ -359,9 +393,11 @@ func (emu *EMU) opCodeError(opcode uint16) error {
 	return fmt.Errorf("Unknown opcode: %x", opcode)
 }
 
+//closes the audio channel when it reaches zero
 func (emu *EMU) soundTimerHandler() {
 	if emu.soundTimer > 0 && emu.soundTimer == 1 {
 		fmt.Println("BEEP!")
+		emu.audioChannel <- struct{}{}
 		emu.soundTimer--
 	}
 }
@@ -370,6 +406,13 @@ func (emu *EMU) delayTimerHandler() {
 	if emu.delayTimer > 0 {
 		emu.delayTimer--
 	}
+}
+
+//prints the string message and closes the audio channel, sends empty struct to shutdown channel
+func (emu *EMU) shutDownSignal(message string) {
+	fmt.Println(message)
+	close(emu.audioChannel)
+	emu.shutdownChannel <- struct{}{}
 }
 
 func (emu *EMU) ManageAudio() {
@@ -387,7 +430,3 @@ func (emu *EMU) ManageAudio() {
 	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 	speaker.Play(streamer)
 }
-
-// func (emu *EMU) keyPressHandle() {
-
-// }
