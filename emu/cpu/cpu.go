@@ -1,12 +1,16 @@
-package chyp
+package cpu
 
 import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"os"
 	"time"
 
 	"chyp8/emu/screen"
+
+	"github.com/faiface/beep/mp3"
+	"github.com/faiface/beep/speaker"
 )
 
 type EMU struct {
@@ -348,6 +352,22 @@ func (emu *EMU) delayTimerHandler() {
 	if emu.delayTimer > 0 {
 		emu.delayTimer--
 	}
+}
+
+func (emu *EMU) ManageAudio() {
+	f, err := os.Open("chyp8/assets/assets_beep.mp3")
+	if err != nil {
+		fmt.Print(err)
+	}
+
+	streamer, format, err := mp3.Decode(f)
+	if err != nil {
+		fmt.Print(err)
+	}
+	defer streamer.Close()
+
+	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+	speaker.Play(streamer)
 }
 
 func (emu *EMU) keyPressHandle() {
