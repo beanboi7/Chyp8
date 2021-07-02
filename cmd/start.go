@@ -17,6 +17,12 @@ var startCmd = &cobra.Command{
 }
 
 // chyp8 start 'path/to/ROM' -r 69
+var refreshRate int
+
+func init() {
+	rootCmd.AddCommand(startCmd)
+}
+
 func Start(cmd *cobra.Command, args []string) {
 	if len(args) != 1 {
 		fmt.Println("Enter the path to the ROM as: `path/ROM` ")
@@ -29,14 +35,8 @@ func Start(cmd *cobra.Command, args []string) {
 	if err != nil {
 		fmt.Printf("\n Error starting the Emulator:%v \n", err)
 	}
-
-	go emu.ManageAudio()
 	go emu.Run()
-}
+	go emu.ManageAudio()
 
-var refreshRate int
-
-func init() {
-	rootCmd.AddCommand(startCmd)
-	startCmd.Flags().IntVarP(&refreshRate, "refresh", "r", 60, "sets the refresh rate of the display")
+	<-emu.ShutdownChannel
 }

@@ -28,7 +28,7 @@ type EMU struct {
 	drawF           bool      //to draw or not
 	clock           *time.Ticker
 	audioChannel    chan struct{}
-	shutdownChannel chan struct{}
+	ShutdownChannel chan struct{}
 	window          *screen.Window
 }
 
@@ -73,8 +73,9 @@ func NewEMU(romPath string, clockSpeed int) (*EMU, error) {
 		sp:              0,
 		keyStates:       [16]uint8{},
 		drawF:           false,
+		clock:           time.NewTicker(time.Second / time.Duration(clockSpeed)),
 		audioChannel:    make(chan struct{}),
-		shutdownChannel: make(chan struct{}),
+		ShutdownChannel: make(chan struct{}),
 		window:          &screen.Window{},
 	}
 	emu.loadFont()
@@ -123,7 +124,7 @@ func (emu *EMU) Run() {
 				continue
 			}
 			break
-		case <-emu.shutdownChannel:
+		case <-emu.ShutdownChannel:
 			break
 		}
 		break
@@ -134,7 +135,7 @@ func (emu *EMU) Run() {
 }
 
 func (emu *EMU) EmulateCycle() {
-	emu.opcode = uint16(emu.memory[emu.pc]<<8 | emu.memory[emu.pc+1])
+	emu.opcode = uint16(emu.memory[emu.pc])<<8 | uint16(emu.memory[emu.pc+1])
 	emu.drawF = false
 
 	err := emu.opCodeParser()
@@ -412,11 +413,11 @@ func (emu *EMU) delayTimerHandler() {
 func (emu *EMU) shutDownSignal(message string) {
 	fmt.Println(message)
 	close(emu.audioChannel)
-	emu.shutdownChannel <- struct{}{}
+	emu.ShutdownChannel <- struct{}{}
 }
 
 func (emu *EMU) ManageAudio() {
-	f, err := os.Open("chyp8/assets/assets_beep.mp3")
+	f, err := os.Open("./assets/assets_beep.mp3")
 	if err != nil {
 		fmt.Print(err)
 	}

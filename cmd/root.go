@@ -29,7 +29,7 @@ var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "chyp8",
+	Use:   "chyp8 [command]",
 	Short: "A brief description of your application",
 	Long:  "chip-8 emulator with GOlang",
 	Run:   Root,
@@ -41,12 +41,16 @@ func Root(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
+	rootCmd.AddCommand(startCmd)
+	startCmd.Flags().IntVarP(&refreshRate, "refresh", "r", 60, "Set the refresh rate in Hz")
 
 }
 
 func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
 
 // initConfig reads in config file and ENV variables if set.
