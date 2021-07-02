@@ -116,10 +116,10 @@ func (emu *EMU) Run() {
 		case <-emu.clock.C:
 			if !emu.window.Closed() {
 				emu.EmulateCycle()
+				emu.keyPushHandler()
+				emu.drawOrUpdate()
 				emu.soundTimerHandler()
 				emu.delayTimerHandler()
-				//draworUPDATE()
-				//handlekeyinput()
 				continue
 			}
 			break
@@ -429,4 +429,36 @@ func (emu *EMU) ManageAudio() {
 
 	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 	speaker.Play(streamer)
+}
+
+func (emu *EMU) keyPushHandler() {
+	for key, val := range emu.window.KeyMap { //iterating over the keymap to check if something is pressed down
+		if emu.window.JustReleased(val) && emu.window.KeysPushed[key] != nil { //if a key is released, ie no longer pressed, then stop the ticker and assign it to nil
+			emu.window.KeysPushed[key].Stop()
+			emu.window.KeysPushed[key] = nil
+		} else if emu.window.JustPressed(val) && emu.window.KeysPushed[key] == nil { //else if a key is pressed and its ticker is zero, start a new ticker for that corresponding key
+			emu.window.KeysPushed[key] = time.NewTicker(keyRepeatDuration)
+			emu.keyStates[key] = 1
+		}
+
+		if emu.window.KeysPushed[key] == nil {
+			continue //when the ticker is at nil and none of the keys are pressed
+		}
+
+		select {
+		case <-emu.window.KeysPushed[key].C:
+			emu.keyStates[key] = 1
+		default:
+			emu.keyStates[key] = 0
+		}
+
+	}
+}
+
+func (emu *EMU) drawOrUpdate() {
+	if emu.drawF {
+		emu.window.Draw(emu.display)
+	} else {
+		emu.window.Update()
+	}
 }
