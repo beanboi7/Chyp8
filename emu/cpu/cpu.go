@@ -59,16 +59,18 @@ var FontSet = [80]uint8{
 //should init window and EMU,
 //load fontset from ROM to mem, return pointer to VM or an error
 func NewEMU(romPath string, clockSpeed int) (*EMU, error) {
+	win, err := screen.NewScreen()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	emu := EMU{
-		opcode:          0,
 		memory:          [4096]uint8{},
 		V:               [16]uint8{},
 		I:               0,
 		pc:              0x200,
-		display:         [2048]uint8{},
-		delayTimer:      0,
-		soundTimer:      0,
+		display:         [64 * 32]uint8{},
 		stack:           [16]uint16{},
 		sp:              0,
 		keyStates:       [16]uint8{},
@@ -76,13 +78,14 @@ func NewEMU(romPath string, clockSpeed int) (*EMU, error) {
 		clock:           time.NewTicker(time.Second / time.Duration(clockSpeed)),
 		audioChannel:    make(chan struct{}),
 		ShutdownChannel: make(chan struct{}),
-		window:          &screen.Window{},
+		window:          win,
 	}
 	emu.loadFont()
-	err := emu.LoadROM(romPath)
-	if err != nil {
+
+	if err := emu.LoadROM(romPath); err != nil {
 		return nil, err
 	}
+
 	return &emu, nil
 
 }
@@ -151,18 +154,20 @@ func (emu *EMU) opCodeParser() error {
 	kk := emu.opcode & 0x00FF
 	F := 15
 
-	switch emu.opcode & 0x0FFF {
-	case 0x00E0:
-		emu.display = [64 * 32]byte{}
-		emu.pc += 2
-		break
-	case 0x00EE:
-		emu.pc = emu.stack[emu.sp]
-		emu.sp--
-		break
-	}
-
 	switch emu.opcode & 0xF000 {
+	case 0x0000:
+		switch emu.opcode & 0x00FF {
+		case 0x00E0:
+			emu.display = [64 * 32]byte{}
+			emu.pc += 2
+			break
+		case 0x00EE:
+			emu.pc = emu.stack[emu.sp] + 2
+			emu.sp--
+			break
+		default:
+			return emu.opCodeError(emu.opcode)
+		}
 	case 0x1000:
 		addr := emu.opcode & 0x0FFF
 		emu.pc = addr
@@ -248,7 +253,7 @@ func (emu *EMU) opCodeParser() error {
 			emu.V[x] /= 2
 			emu.pc += 2
 			break
-		case 7:
+		case 0x0007:
 			if emu.V[y] > emu.V[x] {
 				emu.V[F] = 1
 			} else {
@@ -265,6 +270,8 @@ func (emu *EMU) opCodeParser() error {
 			emu.V[x] <<= 1 //multiplying with two
 			emu.pc += 2
 			break
+		default:
+			return emu.opCodeError(emu.opcode)
 		}
 		break
 	case 0x9000:
@@ -300,7 +307,7 @@ func (emu *EMU) opCodeParser() error {
 			for columns = 0; columns < 8; columns++ {
 				//now to check if the read data from mem[I + ...] and the gfx[] data are set to 1, if yes then we need its 1XOR1 ,ie collision
 				if spriteData&(0x80>>columns) != 0 { //if the bit value read from mem is not 0 and
-					if emu.display[x+uint16(columns)+64*(y+rows)] == 1 { // bitwise value already on the screen is set to 1, then collison is detected and thus 1^1, ie XOR-ed and the V[F] = 1
+					if emu.display[x+uint16(columns)+(64*(y+rows))] == 1 { // bitwise value already on the screen is set to 1, then collison is detected and thus 1^1, ie XOR-ed and the V[F] = 1
 						emu.V[F] = 1 // collison detected
 					}
 					emu.display[x+uint16(columns)+64*(y+rows)] ^= 1
@@ -325,6 +332,8 @@ func (emu *EMU) opCodeParser() error {
 				emu.pc += 2
 			}
 			break
+		default:
+			return emu.opCodeError(emu.opcode)
 		}
 
 	case 0xF000:
@@ -383,6 +392,8 @@ func (emu *EMU) opCodeParser() error {
 			}
 			emu.pc += 2
 			break
+		default:
+			return emu.opCodeError(emu.opcode)
 		}
 	default:
 		return emu.opCodeError(emu.opcode)
@@ -391,7 +402,7 @@ func (emu *EMU) opCodeParser() error {
 }
 
 func (emu *EMU) opCodeError(opcode uint16) error {
-	return fmt.Errorf("Unknown opcode: %x", opcode)
+	return fmt.Errorf("Unknown opcode: %x \n", opcode)
 }
 
 //closes the audio channel when it reaches zero
