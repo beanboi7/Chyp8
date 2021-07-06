@@ -96,8 +96,8 @@ func (emu *EMU) loadFont() {
 	}
 }
 
-func (emu *EMU) LoadROM(filename string) error {
-	rom, err := ioutil.ReadFile(filename)
+func (emu *EMU) LoadROM(path string) error {
+	rom, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -120,10 +120,11 @@ func (emu *EMU) Run() {
 		case <-emu.clock.C:
 			if !emu.window.Closed() {
 				emu.EmulateCycle()
-				emu.keyPushHandler()
 				emu.drawOrUpdate()
-				emu.soundTimerHandler()
+				emu.keyPushHandler()
+
 				emu.delayTimerHandler()
+				emu.soundTimerHandler()
 				continue
 			}
 			break
@@ -152,7 +153,7 @@ func (emu *EMU) opCodeParser() error {
 	x := (emu.opcode & 0x0F00) >> 8 // right shift because V register has index from 0-15 only ad
 	y := (emu.opcode & 0x00F0) >> 4 // similar right shift to get the value of y to lie b/w 0 - 15
 	kk := emu.opcode & 0x00FF
-	F := 15
+	F := 0xF
 
 	switch emu.opcode & 0xF000 {
 	case 0x0000:
@@ -160,80 +161,81 @@ func (emu *EMU) opCodeParser() error {
 		case 0x00E0:
 			emu.display = [64 * 32]byte{}
 			emu.pc += 2
-			break
+
 		case 0x00EE:
 			emu.pc = emu.stack[emu.sp] + 2
 			emu.sp--
-			break
+
 		default:
-			return emu.opCodeError(emu.opcode)
+			return emu.opCodeError(emu.opcode & 0x00FF)
 		}
 	case 0x1000:
 		addr := emu.opcode & 0x0FFF
 		emu.pc = addr
-		break
+
 	case 0x2000:
 		addr := emu.opcode & 0x0FFF
-		emu.pc = addr
 		emu.sp++
 		emu.stack[emu.sp] = emu.pc
-		break
+		emu.pc = addr
+
 	case 0x3000:
 		if emu.V[x] == uint8(kk) {
 			emu.pc += 4
 		} else {
 			emu.pc += 2
 		}
-		break
+
 	case 0x4000:
 		if emu.V[x] != uint8(kk) {
 			emu.pc += 4
 		} else {
 			emu.pc += 2
 		}
-		break
+
 	case 0x5000:
 		if emu.V[x] == emu.V[y] {
 			emu.pc += 4
 		} else {
 			emu.pc += 2
 		}
-		break
+
 	case 0x6000:
 		emu.V[x] = uint8(kk)
 		emu.pc += 2
-		break
+
 	case 0x7000:
 		emu.V[x] += uint8(kk)
 		emu.pc += 2
-		break
+
 	case 0x8000:
 		switch n {
 		case 0x0000:
 			emu.V[x] = emu.V[y]
 			emu.pc += 2
-			break
+
 		case 0x0001:
 			emu.V[x] |= emu.V[y]
 			emu.pc += 2
-			break
+
 		case 0x0002:
 			emu.V[x] &= emu.V[y]
 			emu.pc += 2
-			break
+
 		case 0x0003:
 			emu.V[x] ^= emu.V[y]
 			emu.pc += 2
-			break
+
 		case 0x0004:
-			emu.V[x] += emu.V[y]
-			if emu.V[x] >= 0x00FF {
+
+			if emu.V[x]+emu.V[y] > 0x00FF {
 				emu.V[F] = 1
 			} else {
 				emu.V[F] = 0
 			}
+			emu.V[x] += emu.V[y]
 			emu.pc += 2
-			break
+
 		case 0x0005:
 			if emu.V[x] > emu.V[y] {
 				emu.V[F] = 1
@@ -242,17 +244,20 @@ func (emu *EMU) opCodeParser() error {
 			}
 			emu.V[x] -= emu.V[y]
 			emu.pc += 2
-			break
+
 		case 0x0006:
 			//Vx>>=1
-			if emu.V[x]&0x1 == 1 {
-				emu.V[F] = 1
-			} else {
-				emu.V[F] = 0
-			}
-			emu.V[x] /= 2
+			// if emu.V[x]&0x1 == 1 {
+			// 	emu.V[F] = 1
+			// } else {
+			// 	emu.V[F] = 0
+			// }
+			// emu.V[x] /= 2
+			emu.V[x] = emu.V[y] >> 1
+			emu.V[F] = emu.V[y] & 0x01
+
 			emu.pc += 2
-			break
+
 		case 0x0007:
 			if emu.V[y] > emu.V[x] {
 				emu.V[F] = 1
@@ -261,139 +266,148 @@ func (emu *EMU) opCodeParser() error {
 			}
 			emu.V[x] = emu.V[y] - emu.V[x]
 			emu.pc += 2
-			break
 
 		case 0x000E:
-			//Vx<<=1
-			//basically taking the value of MSB and storing in VF register
-			emu.V[F] = emu.V[x] >> 7
-			emu.V[x] <<= 1 //multiplying with two
+
+			emu.V[x] = emu.V[y] << 1   //multiplying with two
+			emu.V[F] = emu.V[y] & 0x80 //gets MSB
 			emu.pc += 2
-			break
+
 		default:
-			return emu.opCodeError(emu.opcode)
+			return emu.opCodeError(emu.opcode & 0x000F)
 		}
-		break
+
 	case 0x9000:
 		if emu.V[x] != emu.V[y] {
 			emu.pc += 4
 		} else {
 			emu.pc += 2
 		}
-		break
+
 	case 0xA000:
 		addr := emu.opcode & 0x0FFF
 		emu.I = addr
 		emu.pc += 2
-		break
+
 	case 0xB000:
 		addr := emu.opcode & 0x0FFF
-		emu.pc = uint16(emu.V[0] + uint8(addr))
+		emu.pc = uint16(emu.V[0]) + addr
 		emu.pc += 2
-		break
+
 	case 0xC000:
-		random := rand.Intn(255-0) + 0
-		emu.V[x] = uint8(random & int(kk))
+
+		emu.V[x] = uint8(uint16(rand.Intn(255-0)+0) & kk)
 		emu.pc += 2
-		break
+
 	case 0xD000:
 		//draw sprites on the screen
-		emu.drawF = true //need to draw for this cycle
+
 		var rows uint16
-		var columns uint8
+		var columns uint16
 		emu.V[F] = 0
 		for rows = 0; rows < n; rows++ {
-			spriteData := emu.memory[emu.I+rows] //sprite data is stored in the mem[I+yline] address
+			spriteData := uint16(emu.memory[emu.I+rows]) //sprite data is stored in the mem[I+yline] address
 			for columns = 0; columns < 8; columns++ {
+				bitWiseItere := (x + columns + ((y + rows) * 64))
+
+				if bitWiseItere >= uint16(len(emu.display)) {
+					continue
+				}
 				//now to check if the read data from mem[I + ...] and the gfx[] data are set to 1, if yes then we need its 1XOR1 ,ie collision
 				if spriteData&(0x80>>columns) != 0 { //if the bit value read from mem is not 0 and
-					if emu.display[x+uint16(columns)+(64*(y+rows))] == 1 { // bitwise value already on the screen is set to 1, then collison is detected and thus 1^1, ie XOR-ed and the V[F] = 1
+					if emu.display[bitWiseItere] == 1 { // bitwise value already on the screen is set to 1, then collison is detected and thus 1^1, ie XOR-ed and the V[F] = 1
 						emu.V[F] = 1 // collison detected
 					}
-					emu.display[x+uint16(columns)+64*(y+rows)] ^= 1
+					emu.display[bitWiseItere] ^= 1
 				}
+
 			}
 		}
+		emu.drawF = true //need to draw for this cycle
 		emu.pc += 2
 	case 0xE000:
-		//make the keyboard mapping and come here
+
 		switch kk {
-		case 0x9E:
-			if emu.keyStates[emu.V[x]] != 0 {
+		case 0x009E:
+			if emu.keyStates[emu.V[x]] == 1 {
 				emu.pc += 4
+				emu.keyStates[emu.V[x]] = 0
 			} else {
 				emu.pc += 2
 			}
-			break
-		case 0xA1:
+
+		case 0x00A1:
 			if emu.keyStates[emu.V[x]] == 0 {
 				emu.pc += 4
 			} else {
+				emu.keyStates[emu.V[x]] = 0
 				emu.pc += 2
 			}
-			break
+
 		default:
 			return emu.opCodeError(emu.opcode)
 		}
 
 	case 0xF000:
-		addr := emu.opcode & 0x00FF
-		switch addr {
-		case 0x07:
+
+		switch kk {
+		case 0x0007:
 			emu.V[x] = emu.delayTimer
 			emu.pc += 2
-			break
-		case 0x0A:
-			//awaits a keypress by checking value in the array, if true then sets the index to Vx
+
+		case 0x000A:
+			//awaits a keypress by checking value in the array, if true then sets to Vx
 			for i, val := range emu.keyStates {
 				if val != 0 {
 					emu.V[x] = uint8(i)
+					emu.pc += 2
+
 				}
 			}
-			emu.pc += 2
-			break
-		case 0x15:
+			emu.keyStates[emu.V[x]] = 0
+
+		case 0x0015:
 			emu.delayTimer = emu.V[x]
 			emu.pc += 2
-			break
-		case 0x18:
+
+		case 0x0018:
 			emu.soundTimer = emu.V[x]
 			emu.pc += 2
-			break
-		case 0x1E:
-			emu.I = emu.I + uint16(emu.V[x])
-			if emu.I > 0xFFF {
-				emu.V[F] = 1
-			} else {
-				emu.V[F] = 0
-			}
+
+		case 0x001E:
+			emu.I += uint16(emu.V[x])
+			// if emu.I > 0xFFF {
+			// 	emu.V[F] = 1
+			// } else {
+			// 	emu.V[F] = 0
+			// }
 			emu.pc += 2
-			break
-		case 0x29:
-			//no idea what this instruction does
-			emu.I = uint16(emu.V[x] * 0x5)
+
+		case 0x0029:
+			// FX29: Sets I to the location of the sprite for the character in VX. Characters 0-F (in hexadecimal) are represented by a 4x5 font
+			emu.I = uint16(emu.V[x]) * 0x5
 			emu.pc += 2
-		case 0x33:
+
+		case 0x0033:
 			emu.memory[emu.I] = emu.V[x] / 100
 			emu.memory[emu.I+1] = (emu.V[x] / 10) % 10
 			emu.memory[emu.I+2] = (emu.V[x] % 100) % 10
 			emu.pc += 2
-			break
 
-		case 0x55:
-			for i := 0; i < int(x+1); i++ {
-				emu.memory[emu.I+uint16(i)] = emu.V[i]
+		case 0x0055:
+			for i := uint16(0); i <= x; i++ {
+				emu.memory[emu.I+i] = emu.V[i]
 			}
 			emu.pc += 2
-			break
-		case 0x65:
-			for i := 0; i < int(x+1); i++ {
-				emu.V[i] = emu.memory[emu.I+uint16(i)]
+
+		case 0x0065:
+			for i := uint16(0); i <= x; i++ {
+				emu.V[i] = emu.memory[emu.I+i]
 			}
 			emu.pc += 2
-			break
+
 		default:
-			return emu.opCodeError(emu.opcode)
+			return emu.opCodeError(emu.opcode & 0x00FF)
 		}
 	default:
 		return emu.opCodeError(emu.opcode)
@@ -461,7 +475,7 @@ func (emu *EMU) keyPushHandler() {
 		case <-emu.window.KeysPushed[key].C:
 			emu.keyStates[key] = 1
 		default:
-			emu.keyStates[key] = 0
+			// emu.keyStates[key] = 0
 		}
 
 	}
@@ -471,6 +485,6 @@ func (emu *EMU) drawOrUpdate() {
 	if emu.drawF {
 		emu.window.Draw(emu.display)
 	} else {
-		emu.window.Update()
+		emu.window.UpdateInput()
 	}
 }

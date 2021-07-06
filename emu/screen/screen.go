@@ -64,19 +64,18 @@ func (w *Window) Draw(display [64 * 32]uint8) {
 	w.Clear(colornames.Black)
 	draw := imdraw.New(nil)
 	draw.Color = pixel.RGB(1, 1, 1)
-	width, height := winX/screenWidth, winY/screenWidth
+	width, height := winX/screenWidth, winY/screenHeight
 
 	//now to check if the screen's pixel is set or not and accordingly draw
 
 	for y := 0; y < 64; y++ {
 		for x := 0; x < 32; x++ {
-			if display[64+y*(31-x)] == 0 {
+			if display[(31-x)*64+y] == 0 {
 				continue
-			} else {
-				draw.Push(pixel.V(width*float64(x), height*float64(y)))
-				draw.Push(pixel.V(width*float64(x)+width, height*float64(y)+height))
-				draw.Rectangle(0)
 			}
+			draw.Push(pixel.V(width*float64(y), height*float64(x)))
+			draw.Push(pixel.V(width*float64(y)+width, height*float64(x)+height))
+			draw.Rectangle(0)
 		}
 	}
 	draw.Draw(w)

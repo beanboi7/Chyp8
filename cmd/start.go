@@ -34,6 +34,7 @@ func Start(cmd *cobra.Command, args []string) {
 	emu, err := cpu.NewEMU(romPath, refreshRate)
 	if err != nil {
 		fmt.Printf("\n Error starting the Emulator:%v \n", err)
+		os.Exit(1)
 	}
 	go emu.Run()
 	go emu.ManageAudio()
