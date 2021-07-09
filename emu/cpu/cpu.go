@@ -167,17 +167,20 @@ func (emu *EMU) opCodeParser() error {
 			emu.sp--
 
 		default:
+			fmt.Println(emu.opcode)
 			return emu.opCodeError(emu.opcode & 0x00FF)
 		}
 	case 0x1000:
 		addr := emu.opcode & 0x0FFF
 		emu.pc = addr
+		fmt.Println(emu.opcode)
 
 	case 0x2000:
 		addr := emu.opcode & 0x0FFF
 		emu.sp++
 		emu.stack[emu.sp] = emu.pc
 		emu.pc = addr
+		fmt.Println(emu.opcode)
 
 	case 0x3000:
 		if emu.V[x] == uint8(kk) {
@@ -185,6 +188,7 @@ func (emu *EMU) opCodeParser() error {
 		} else {
 			emu.pc += 2
 		}
+		fmt.Println(emu.opcode)
 
 	case 0x4000:
 		if emu.V[x] != uint8(kk) {
@@ -192,6 +196,7 @@ func (emu *EMU) opCodeParser() error {
 		} else {
 			emu.pc += 2
 		}
+		fmt.Println(emu.opcode)
 
 	case 0x5000:
 		if emu.V[x] == emu.V[y] {
@@ -199,14 +204,16 @@ func (emu *EMU) opCodeParser() error {
 		} else {
 			emu.pc += 2
 		}
+		fmt.Println(emu.opcode)
 
 	case 0x6000:
 		emu.V[x] = uint8(kk)
 		emu.pc += 2
-
+		fmt.Println(emu.opcode)
 	case 0x7000:
 		emu.V[x] += uint8(kk)
 		emu.pc += 2
+		fmt.Println(emu.opcode)
 
 	case 0x8000:
 		switch n {
@@ -259,11 +266,11 @@ func (emu *EMU) opCodeParser() error {
 			emu.pc += 2
 
 		case 0x0007:
-			if emu.V[y] > emu.V[x] {
-				emu.V[F] = 1
-			} else {
-				emu.V[F] = 0
-			}
+			// if emu.V[y] > emu.V[x] {
+			// 	emu.V[F] = 1
+			// } else {
+			// 	emu.V[F] = 0
+			// }
 			emu.V[x] = emu.V[y] - emu.V[x]
 			emu.pc += 2
 
@@ -274,6 +281,7 @@ func (emu *EMU) opCodeParser() error {
 			emu.pc += 2
 
 		default:
+			fmt.Println(emu.opcode)
 			return emu.opCodeError(emu.opcode & 0x000F)
 		}
 
@@ -283,48 +291,52 @@ func (emu *EMU) opCodeParser() error {
 		} else {
 			emu.pc += 2
 		}
-
+		fmt.Println(emu.opcode)
 	case 0xA000:
 		addr := emu.opcode & 0x0FFF
 		emu.I = addr
 		emu.pc += 2
+		fmt.Println(emu.opcode)
 
 	case 0xB000:
 		addr := emu.opcode & 0x0FFF
 		emu.pc = uint16(emu.V[0]) + addr
 		emu.pc += 2
+		fmt.Println(emu.opcode)
 
 	case 0xC000:
 
 		emu.V[x] = uint8(uint16(rand.Intn(255-0)+0) & kk)
 		emu.pc += 2
+		fmt.Println(emu.opcode)
 
 	case 0xD000:
 		//draw sprites on the screen
-
 		var rows uint16
 		var columns uint16
 		emu.V[F] = 0
 		for rows = 0; rows < n; rows++ {
 			spriteData := uint16(emu.memory[emu.I+rows]) //sprite data is stored in the mem[I+yline] address
 			for columns = 0; columns < 8; columns++ {
-				bitWiseItere := (x + columns + ((y + rows) * 64))
+				pixel := uint16(emu.V[x]) + columns + ((uint16(emu.V[y]) + rows) * 64)
 
-				if bitWiseItere >= uint16(len(emu.display)) {
-					continue
+				if pixel >= uint16(len(emu.display)) {
+					break
+					// continue
 				}
 				//now to check if the read data from mem[I + ...] and the gfx[] data are set to 1, if yes then we need its 1XOR1 ,ie collision
 				if spriteData&(0x80>>columns) != 0 { //if the bit value read from mem is not 0 and
-					if emu.display[bitWiseItere] == 1 { // bitwise value already on the screen is set to 1, then collison is detected and thus 1^1, ie XOR-ed and the V[F] = 1
+					if emu.display[pixel] == 1 { // bitwise value already on the screen is set to 1, then collison is detected and thus 1^1, ie XOR-ed and the V[F] = 1
 						emu.V[F] = 1 // collison detected
 					}
-					emu.display[bitWiseItere] ^= 1
+					emu.display[pixel] ^= 1
 				}
 
 			}
 		}
 		emu.drawF = true //need to draw for this cycle
 		emu.pc += 2
+		fmt.Println(emu.opcode)
 	case 0xE000:
 
 		switch kk {
@@ -345,6 +357,7 @@ func (emu *EMU) opCodeParser() error {
 			}
 
 		default:
+			fmt.Println(emu.opcode)
 			return emu.opCodeError(emu.opcode)
 		}
 
@@ -407,9 +420,11 @@ func (emu *EMU) opCodeParser() error {
 			emu.pc += 2
 
 		default:
+			fmt.Println(emu.opcode)
 			return emu.opCodeError(emu.opcode & 0x00FF)
 		}
 	default:
+		fmt.Println("ok")
 		return emu.opCodeError(emu.opcode)
 	}
 	return nil
