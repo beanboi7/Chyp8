@@ -1,5 +1,5 @@
 # Introduction
-Chip-8 is an interpretted language designed to create programs/games on the 8bit systems like the COSMIC VIP.
+Chip-8 is an interpretted language designed to create programs/games on the 8bit systems like the COSMAC VIP and Telmac 1800.
 Chyp8 is an emulator of the Chip-8 system build with Golang. For more info on Chip-8 refer [here](https://en.wikipedia.org/wiki/CHIP-8)
 
 ## How to build it:
