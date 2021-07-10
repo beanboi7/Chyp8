@@ -1,6 +1,6 @@
-# About
+# Introduction
 Chip-8 is an interpretted language designed to create programs/games on the 8bit systems like the COSMIC VIP.
-Chyp8 is an emulator of the Chip-8 system build with Golang.
+Chyp8 is an emulator of the Chip-8 system build with Golang. For more info on Chip-8 refer [here](https://en.wikipedia.org/wiki/CHIP-8)
 
 ## How to build it:
 Clone the master branch and use ```go run main.go start roms/NAME_OF_THE_ROM -r=REFRESHRATE```
@@ -26,3 +26,9 @@ It's set to ```60``` by default.
 ## Issues
 - [ ] Fix audio bug
 - [ ] Find correct ticker for the keypad
+
+## References 
+- [Laurence Muller's post on writing an emulator](https://multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/) 
+- [Cowgod's chip-8 technical reference manual](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.4)
+- [Chippy](https://github.com/bradford-hamilton/chippy)
+- r/EmuDev
