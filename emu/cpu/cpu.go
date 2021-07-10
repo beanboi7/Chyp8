@@ -33,7 +33,7 @@ type EMU struct {
 }
 
 const (
-	keyRepeatDuration = time.Second / 5
+	keyRepeatDuration = time.Second / 100000
 	maxRomSize        = 0xFFF - 0x200
 )
 
@@ -134,7 +134,7 @@ func (emu *EMU) Run() {
 		break
 	}
 
-	emu.shutDownSignal("bye")
+	emu.shutDownSignal("SayoNara m8")
 
 }
 
@@ -150,8 +150,8 @@ func (emu *EMU) EmulateCycle() {
 
 func (emu *EMU) opCodeParser() error {
 	n := emu.opcode & 0x000F
-	x := (emu.opcode & 0x0F00) >> 8 // right shift because V register has index from 0-15 only ad
-	y := (emu.opcode & 0x00F0) >> 4 // similar right shift to get the value of y to lie b/w 0 - 15
+	x := (emu.opcode & 0x0F00) >> 8
+	y := (emu.opcode & 0x00F0) >> 4
 	kk := emu.opcode & 0x00FF
 	F := 0xF
 
@@ -167,20 +167,17 @@ func (emu *EMU) opCodeParser() error {
 			emu.sp--
 
 		default:
-			fmt.Println(emu.opcode)
 			return emu.opCodeError(emu.opcode & 0x00FF)
 		}
 	case 0x1000:
 		addr := emu.opcode & 0x0FFF
 		emu.pc = addr
-		fmt.Println(emu.opcode)
 
 	case 0x2000:
 		addr := emu.opcode & 0x0FFF
 		emu.sp++
 		emu.stack[emu.sp] = emu.pc
 		emu.pc = addr
-		fmt.Println(emu.opcode)
 
 	case 0x3000:
 		if emu.V[x] == uint8(kk) {
@@ -188,7 +185,6 @@ func (emu *EMU) opCodeParser() error {
 		} else {
 			emu.pc += 2
 		}
-		fmt.Println(emu.opcode)
 
 	case 0x4000:
 		if emu.V[x] != uint8(kk) {
@@ -196,7 +192,6 @@ func (emu *EMU) opCodeParser() error {
 		} else {
 			emu.pc += 2
 		}
-		fmt.Println(emu.opcode)
 
 	case 0x5000:
 		if emu.V[x] == emu.V[y] {
@@ -204,16 +199,14 @@ func (emu *EMU) opCodeParser() error {
 		} else {
 			emu.pc += 2
 		}
-		fmt.Println(emu.opcode)
 
 	case 0x6000:
 		emu.V[x] = uint8(kk)
 		emu.pc += 2
-		fmt.Println(emu.opcode)
+
 	case 0x7000:
 		emu.V[x] += uint8(kk)
 		emu.pc += 2
-		fmt.Println(emu.opcode)
 
 	case 0x8000:
 		switch n {
@@ -281,7 +274,7 @@ func (emu *EMU) opCodeParser() error {
 			emu.pc += 2
 
 		default:
-			fmt.Println(emu.opcode)
+
 			return emu.opCodeError(emu.opcode & 0x000F)
 		}
 
@@ -291,24 +284,21 @@ func (emu *EMU) opCodeParser() error {
 		} else {
 			emu.pc += 2
 		}
-		fmt.Println(emu.opcode)
+
 	case 0xA000:
 		addr := emu.opcode & 0x0FFF
 		emu.I = addr
 		emu.pc += 2
-		fmt.Println(emu.opcode)
 
 	case 0xB000:
 		addr := emu.opcode & 0x0FFF
 		emu.pc = uint16(emu.V[0]) + addr
 		emu.pc += 2
-		fmt.Println(emu.opcode)
 
 	case 0xC000:
 
 		emu.V[x] = uint8(uint16(rand.Intn(255-0)+0) & kk)
 		emu.pc += 2
-		fmt.Println(emu.opcode)
 
 	case 0xD000:
 		//draw sprites on the screen
@@ -336,7 +326,7 @@ func (emu *EMU) opCodeParser() error {
 		}
 		emu.drawF = true //need to draw for this cycle
 		emu.pc += 2
-		fmt.Println(emu.opcode)
+
 	case 0xE000:
 
 		switch kk {
@@ -357,7 +347,7 @@ func (emu *EMU) opCodeParser() error {
 			}
 
 		default:
-			fmt.Println(emu.opcode)
+
 			return emu.opCodeError(emu.opcode)
 		}
 
@@ -420,7 +410,7 @@ func (emu *EMU) opCodeParser() error {
 			emu.pc += 2
 
 		default:
-			fmt.Println(emu.opcode)
+
 			return emu.opCodeError(emu.opcode & 0x00FF)
 		}
 	default:

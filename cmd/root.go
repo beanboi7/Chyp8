@@ -15,8 +15,8 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "chyp8 [command]",
-	Short: "A brief description of your application",
-	Long:  "chip-8 emulator with GOlang",
+	Short: "Chip-8 emulator using Go",
+	Long:  "A Chip-8 emulator written from scratch that mimics the functionalities of a Chip-8, an interpretted language originally written for the COSMIC-VIP/ Telmac 8 bit systems.",
 	Run:   Root,
 	Args:  cobra.ExactArgs(1),
 }
