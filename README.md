@@ -31,4 +31,3 @@ It's set to ```60``` by default.
 - [Laurence Muller's post on writing an emulator](https://multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/) 
 - [Cowgod's chip-8 technical reference manual](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.4)
 - [Chippy](https://github.com/bradford-hamilton/chippy)
-- r/EmuDev
