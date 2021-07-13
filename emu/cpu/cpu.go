@@ -21,7 +21,7 @@ type EMU struct {
 	pc              uint16         //program counter fetches the next instruction from memory
 	display         [64 * 32]uint8 //display represented as an array
 	delayTimer      uint8          //counts down at 60Hz
-	soundTimer      uint8          //counts down at 60Hx
+	soundTimer      uint8          //counts down at 60Hz
 	stack           [16]uint16     //virtual stack
 	sp              uint16         //stack pointer
 	keyStates       [16]uint8      //tells whether key is pressed or not
@@ -160,13 +160,9 @@ func (emu *EMU) opCodeError(opcode uint16) error {
 func (emu *EMU) soundTimerHandler() {
 	if emu.soundTimer > 0 && emu.soundTimer == 1 {
 		fmt.Println("BEEP!")
-		// emu.ManageAudio() //testing
 		emu.audioChannel <- struct{}{}
 		emu.soundTimer--
 	}
-	// if emu.soundTimer > 0 {
-	// 	emu.soundTimer--
-	// }
 }
 
 //delay timer runs until it reaches 0
