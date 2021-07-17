@@ -195,6 +195,7 @@ func (emu *EMU) ManageAudio() {
 
 	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 	speaker.Play(streamer)
+	select {}
 }
 
 //polls for a kep press on the keyboard
